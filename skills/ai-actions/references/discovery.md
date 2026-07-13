@@ -41,6 +41,8 @@ Spoken parameters are rarely the app's internal keys. A user says a place, produ
 
 Example shape: a place-name → region-code resolver (address string → administrative code). Look for name→id / geocode / category-lookup helpers (`grep -rin "geocode\|lookup\|resolve\|byName\|findCode\|toId"` and whatever the app's domain calls it). If a param is a place, category, or named entity and **no resolver exists**, flag it: the action needs one before it can be voice-driven (or the parameter must be modeled as a resolvable entity — see the platform templates).
 
+**iOS 27+ changes the recommendation.** The platform now resolves spoken names itself if the parameter is modeled as an entity: conform it to **`IndexedEntity`** (content indexed ahead of time into the system semantic index — meaning-based matching, not string matching) or implement **`EntityStringQuery`** (runtime lookup, for large / server-backed / fast-changing datasets). So on iOS 27+ the first move is *model the parameter as an entity*, not *write a custom resolver*; a hand-rolled resolver remains the fallback for iOS 16–26 targets and for Android. See the iOS templates for the code shapes.
+
 ## What makes a good candidate
 
 Capture per candidate: **name · file:line · what it does · inputs · output · read-or-write**.
@@ -60,7 +62,8 @@ Score each candidate 0–2 on five axes. Shortlist the highest totals.
 | **Safety (read/write)** | destructive, no undo | mutating, reversible | read-only |
 
 Notes:
-- **AI-can't-do-it-alone is the tie-breaker.** An action the assistant could answer without your app will rarely get routed to you. Domain-specific, data-backed actions win.
+- **AI-can't-do-it-alone is the tie-breaker.** An action the assistant could answer without your app will rarely get routed to you. Domain-specific, data-backed actions win. (And the bar rises over time: as the assistant's own model gets bigger, generic tasks it once punted on get absorbed — only app-data-backed actions keep their reason to exist.)
+- **Schema-domain match is a routing bonus (iOS 27+).** If a candidate fits a system-defined App Schema domain (messaging, mail, photos, task management, …), Siri routes natural language to it with no phrases and minimal code — all else equal, rank the schema-matching candidate above an otherwise-similar custom one, and mark the match in the shortlist table.
 - Low **Safety** score doesn't disqualify — it means the intent needs a confirmation step (see platform templates), not that you skip it.
 - Prefer several **narrow** actions over one god-action. The list itself is the catalog the AI chooses from, so more well-named entries = better routing.
 

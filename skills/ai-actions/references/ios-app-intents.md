@@ -4,6 +4,45 @@ Target iOS 16+ (App Intents). iOS 26/27 gets the LLM-routed Siri, so free-form p
 
 The intent is a **thin wrapper** over existing app code. Never reimplement logic inside `perform()` — call the real service/use-case.
 
+## 0. App Schemas first (iOS 27+): check for a system schema before writing a custom intent
+
+iOS 27 adds **App Schemas** — system-defined intent and entity shapes grouped into domains (`.messages`, `.mail`, `.photos`, task management, …). An intent that conforms to a schema gets routed from **any natural phrasing with zero predefined phrases**, and inherits future Siri language improvements without code changes. So for every shortlisted action, check the schema catalog first:
+
+- **A schema matches** → declare conformance and shape parameters to the schema's slots. The wrapper body is the same thin call into existing logic:
+
+```swift
+struct SendMessageIntent: AppIntent {
+    static let schema: Intent.Schema = .messages.sendMessage
+
+    @Parameter var recipient: ContactEntity
+    @Parameter var messageContent: String
+
+    func perform() async throws -> some IntentResult {
+        let sent = try await chatService.send(to: recipient.id, text: messageContent)
+        return .result(value: sent.entity)
+    }
+}
+```
+
+- **No schema matches** (the usual case for domain-specific actions) → write a custom intent per the templates below. Nothing is lost; schemas are a routing shortcut, not a gate.
+
+Two cautions: Xcode validates schema adoption at build time and will demand **related schemas** (adopting `sendMessage` pulls in `draftMessage` — expect Fix-Its, and budget for the siblings), and schema conformance requires iOS 27, so on lower deployment targets keep the custom intent + AppShortcut phrases as the shipping path.
+
+## Entity schemas + semantic index (iOS 27+): let the system resolve spoken names
+
+The old problem — "the user *says* a name, the API wants an *id*" — gets a platform answer. Conform the entity to a schema and index it, and Siri resolves the spoken value for you:
+
+```swift
+@AppEntity(schema: .messages.contact)
+struct ContactEntity: IndexedEntity {
+    @Property(indexingKey: \.textContent)
+    var name: String
+    // indexed into the system semantic index → meaning-based matching
+}
+```
+
+For data too large, server-backed, or fast-changing to index ahead of time, implement **`EntityStringQuery`** instead — a runtime string → entities lookup that wraps whatever search the app already has. Prefer one of these two over a hand-rolled resolver on iOS 27+; keep the custom resolver only for older targets.
+
 ## Prefer value-returning intents; open-only is the fallback
 
 Two shapes exist, and the difference is the whole point:
@@ -111,7 +150,7 @@ If the app already handles a URL scheme, an alternative is to open that URL from
 
 ## 4. Entities (for typed parameters)
 
-When a parameter is a domain object (an account, a document), model it as an `AppEntity` with an `EntityQuery` so Siri/Shortcuts can resolve it by name. Only add this when a parameter genuinely refers to app data.
+When a parameter is a domain object (an account, a document), model it as an `AppEntity` with an `EntityQuery` so Siri/Shortcuts can resolve it by name. Only add this when a parameter genuinely refers to app data. (On iOS 27+, also consider schema conformance + `IndexedEntity` / `EntityStringQuery` — see §0 above — which upgrades resolution from exact-name to semantic matching.)
 
 ```swift
 struct AccountEntity: AppEntity {
@@ -142,10 +181,12 @@ struct AppShortcuts: AppShortcutsProvider {
 
 ## Checklist
 
+- [ ] (iOS 27+) Checked the App Schema catalog; schema-matching actions declare `static let schema:` conformance.
 - [ ] Intent calls existing logic, no reimplementation.
 - [ ] `title` + `description` are specific (assistant reads them to route).
 - [ ] Write actions have `requestConfirmation`.
 - [ ] Dependencies registered in `AppDependencyManager`.
 - [ ] AppShortcut phrases include `\(.applicationName)`.
 - [ ] Deep link exists for any "open for details" target.
-- [ ] Builds; intent appears in the Shortcuts app.
+- [ ] Entity parameters resolvable by spoken name (`EntityQuery`; iOS 27+: `IndexedEntity` / `EntityStringQuery`).
+- [ ] Builds; intent appears in the Shortcuts app. (iOS 27+: routing verified with an `AppIntentsTesting` test, not just presence in Shortcuts.)

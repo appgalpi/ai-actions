@@ -27,7 +27,8 @@ If both exist (shared repo / KMP), handle each side separately and say so. Note 
 
 **Check the SDK/OS target as a hard prerequisite, not a footnote:**
 - iOS → App Intents needs iOS 16+, but **report the routing-capability tier from the deployment target**, because it changes what the user actually gets:
-  - **iOS 26/27+**: LLM-powered Siri freely reasons and routes any phrasing to your intent. Full experience.
+  - **iOS 27+**: everything in the 26 tier, **plus App Schemas** — if an intent conforms to a system-defined schema (`static let schema: Intent.Schema = .messages.sendMessage`; domains cover messaging, mail, photos, task management, …), Siri routes natural language to it **with no predefined phrases at all**, and the intent inherits future Siri language improvements without code changes. During inventory, note which candidates fit a schema domain — those get the best routing for the least code.
+  - **iOS 26**: LLM-powered Siri freely reasons and routes any phrasing to your intent. Full experience.
   - **iOS 16–25**: intents exist but reach the user only via **predefined AppShortcut phrases + Spotlight + Shortcuts** — no free-form routing.
   This is a *runtime capability tier*, not a build gate (unlike Android's SDK requirement). Read `IPHONEOS_DEPLOYMENT_TARGET`. If it's below 26, tell the user their actions work on old OSes only through predefined phrases, and that the branch pattern (`if #available(iOS 26, *)`) lets one build serve both — free routing on new OSes, phrase/Spotlight fallback on old. AppShortcut phrases become **required for backward compat**, not optional.
 - Android → AppFunctions needs **compileSdk/targetSdk 36 (Android 16)**. Read `build.gradle(.kts)`. If it's below 36, say so up front: bumping compileSdk affects the whole build and must happen *before* any AppFunctions code. Treat it as step zero, and flag the risk. (minSdk can stay lower; guard the functions with `@RequiresApi(36)`.)
@@ -41,7 +42,7 @@ Search the codebase for discrete, user-meaningful operations. Good hunting groun
 
 For each candidate capture: name, file:line, what it does, inputs, output, and whether it **reads** (safe) or **writes/mutates** (needs a confirmation step).
 
-**Also check for an existing in-app AI scaffold** (Firebase AI / Gemini Live / an LLM function-calling tool, e.g. a voice-search ViewModel). If one exists: (a) it's the highest-signal template — its function schemas show exactly which operations are already shaped for AI use, so reuse them; (b) make the distinction explicit to the user — that scaffold runs *inside* the app, whereas App Intents / AppFunctions expose actions to the *system* assistant from outside. They're different layers; you're adding the second.
+**Also check for an existing in-app AI scaffold.** Android: Firebase AI / Gemini Live / an LLM function-calling tool (e.g. a voice-search ViewModel). iOS: the Foundation Models framework — grep `import FoundationModels`, `LanguageModelSession`, `: Tool`, `@Generable`, `DynamicProfile`, and provider packages (`AnthropicLanguageModel`, `GoogleLanguageModel`, `MLXLanguageModel`, `CoreAILanguageModel`; iOS 27 lets any conforming model sit behind the same session, so adoption is spreading). If one exists: (a) it's the highest-signal template — its function schemas show exactly which operations are already shaped for AI use, so reuse them; (b) make the distinction explicit to the user — that scaffold runs *inside* the app, whereas App Intents / AppFunctions expose actions to the *system* assistant from outside. They're different layers; you're adding the second.
 
 Read `references/discovery.md` for concrete search patterns and heuristics before this step.
 
@@ -70,7 +71,7 @@ One action = one intent/function. Reuse the app's existing logic — the intent/
 
 Two things break the "thin wrapper" assumption in practice — check for both:
 
-- **Logic entangled with UI state.** If the operation you want lives in a ViewModel and depends on observed state (`@Observable` / `StateFlow` / `@Published` that a screen populates), you can't call it from an intent — there's no screen. **Extract the pure logic into a plain callable first** (a function/service method that takes its inputs as parameters and returns a value), have the ViewModel call that too, then wrap the plain callable. This is a small refactor, not a reimplementation — the app keeps one source of truth.
+- **Logic entangled with UI state.** If the operation you want lives in a ViewModel and depends on observed state (`@Observable` / `StateFlow` / `@Published` that a screen populates), you can't call it from an intent — there's no screen. **Extract the pure logic into a plain callable first** (a function/service method that takes its inputs as parameters and returns a value), have the ViewModel call that too, then wrap the plain callable. This is a small refactor, not a reimplementation — the app keeps one source of truth. Bonus: the same extracted callable also wraps cleanly as a Foundation Models `Tool` (iOS) or an in-app function-calling tool (Android), so one refactor serves both the system assistant and any in-app AI feature — worth telling the user.
 - **The action runs outside the app's lifecycle.** An App Intent / AppFunction executes without the app's normal launch, so it often can't grab a ViewModel, `@Environment` object, or already-configured container. It must **bootstrap its own dependencies**: ensure SDKs are initialized (e.g. `FirebaseApp.configure()`), construct the services directly or open its own data container (`ModelContainer` / Room instance / `AppContainer.get(context)`), and read user selection ("my team") straight from the stored source (UserDefaults / App Group / DataStore) — noting the exact key and encoding, since it may differ from the display value.
 
 ### 5. Wire "details → open the app"
@@ -79,7 +80,7 @@ Simple answers come back as a spoken/inline result; richer detail opens the app 
 
 ### 6. Verify
 
-Build the target (XcodeBuildMCP for iOS sim, Gradle for Android). Confirm the intent/function is registered (shows in Shortcuts / the AppFunctions index). Don't claim it's assistant-callable if you only got it to compile — say exactly what you verified.
+Build the target (XcodeBuildMCP for iOS sim, Gradle for Android). Confirm the intent/function is registered (shows in Shortcuts / the AppFunctions index). On iOS 27+, go one step further: the **`AppIntentsTesting`** framework exercises the real Siri / Shortcuts / Spotlight routing paths from a test target (no UI automation), so write a routing test per shipped intent instead of stopping at "it shows in Shortcuts". Don't claim it's assistant-callable if you only got it to compile — say exactly what you verified.
 
 ## Reality checks to tell the user
 

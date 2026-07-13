@@ -25,7 +25,7 @@ The **analysis** is the verified core, exercised across multiple real iOS and An
 
 ## Platform notes
 
-- **iOS** — App Intents is the only supported path (SiriKit is deprecated as of iOS 27). Free-form assistant routing arrives with the LLM-powered Siri on iOS 26/27; on iOS 16–25 actions reach the user only through predefined phrases, Spotlight, and Shortcuts. The skill reports which tier your deployment target lands in.
+- **iOS** — App Intents is the only supported path (SiriKit is deprecated as of iOS 27). Free-form assistant routing arrives with the LLM-powered Siri on iOS 26/27; iOS 27 adds **App Schemas** (system-defined intent/entity shapes that route natural language with no predefined phrases), and the skill flags candidates that match a schema domain. On iOS 16–25 actions reach the user only through predefined phrases, Spotlight, and Shortcuts. The skill reports which tier your deployment target lands in.
 - **Android** — AppFunctions needs Android 16 / API 36 (`compileSdk 36`). General-developer Gemini routing is still rolling out via a trusted-tester preview, so implementation is ready before live routing is universally available.
 
 ## Installation
@@ -86,7 +86,7 @@ iOS·Android 프로젝트를 분석해서, **어떤 기능을 스마트폰 AI �
 
 ## 플랫폼 참고
 
-- **iOS** — App Intents가 유일한 경로입니다(SiriKit은 iOS 27부터 폐기). 자유 문장 라우팅은 iOS 26/27의 LLM 기반 Siri부터 되고, iOS 16–25에서는 미리 등록한 문구·Spotlight·단축어로만 도달합니다. 스킬이 당신 배포 타깃이 어느 등급인지 알려줍니다.
+- **iOS** — App Intents가 유일한 경로입니다(SiriKit은 iOS 27부터 폐기). 자유 문장 라우팅은 iOS 26/27의 LLM 기반 Siri부터 되고, iOS 27에는 **App Schemas**(문구 등록 없이 자연어를 라우팅하는 시스템 정의 인텐트/엔티티 양식)가 추가돼 스킬이 스키마 도메인에 맞는 후보를 표시해줍니다. iOS 16–25에서는 미리 등록한 문구·Spotlight·단축어로만 도달합니다. 스킬이 당신 배포 타깃이 어느 등급인지 알려줍니다.
 - **Android** — AppFunctions는 Android 16 / API 36(`compileSdk 36`)이 필요합니다. 일반 개발자용 Gemini 라우팅은 아직 신뢰 테스터 프리뷰로 확대 중이라, 구현은 미리 해둘 수 있어도 라이브 라우팅은 점진적으로 열립니다.
 
 ## 설치
